@@ -19,6 +19,9 @@ services:
 volumes:
   bon_data:
 
+# HTTPS via Nginx Proxy Manager (stack revproxy) :
+#   docker compose -f docker-compose.yml -f docker-compose.npm.yml up -d --build
+#
 # Sous-réseau dédié (libre sur le serveur) :
 # utilisés ailleurs → 172.25.x (Appwrite), 172.31.x (DSI, docs…), 172.40.x (Orizon)
 networks:

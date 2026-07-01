@@ -1,0 +1,27 @@
+# Nginx Proxy Manager (stack revproxy sur Portainer)
+#
+# Déploiement :
+#   docker compose -f docker-compose.yml -f docker-compose.npm.yml up -d --build
+#
+# Configuration NPM (http://webapps:81) → Proxy Hosts → Add :
+#   Domain Names     : bons.votredomaine.fr
+#   Scheme           : http
+#   Forward Hostname : bon-intervention-app
+#   Forward Port     : 1899
+#   Block Common Exploits : ON
+#   Websockets Support    : ON
+#   SSL → Request a new SSL Certificate (Let's Encrypt)
+#   Force SSL        : ON
+#
+# DNS : enregistrement A de bons.votredomaine.fr → IP publique du serveur
+
+services:
+  app:
+    networks:
+      - bon_net
+      - revproxy_proxy
+
+networks:
+  revproxy_proxy:
+    external: true
+    name: revproxy_proxy
