@@ -1,0 +1,21 @@
+# Usage avec Traefik :
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up --build -d
+#
+# Adapter Host(), entrypoints et le nom du réseau selon l'infra de votre partenaire.
+
+services:
+  app:
+    networks:
+      - default
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bon-intervention.rule=Host(`bon-intervention.example.com`)
+      - traefik.http.routers.bon-intervention.entrypoints=websecure
+      - traefik.http.routers.bon-intervention.tls=true
+      - traefik.http.services.bon-intervention.loadbalancer.server.port=1899
+
+networks:
+  traefik:
+    external: true
+    name: traefik
