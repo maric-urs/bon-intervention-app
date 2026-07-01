@@ -13,15 +13,17 @@ services:
     volumes:
       - bon_data:/data
     networks:
-      - frontend_net
+      - bon_net
     restart: unless-stopped
 
 volumes:
   bon_data:
 
-# Réutilise le réseau Orizon (évite le conflit de subnet 172.40.0.0/16).
-# Vérifier le nom exact : docker network ls | grep frontend
+# Sous-réseau dédié (libre sur le serveur) :
+# utilisés ailleurs → 172.25.x (Appwrite), 172.31.x (DSI, docs…), 172.40.x (Orizon)
 networks:
-  frontend_net:
-    external: true
-    name: ${FRONTEND_NETWORK:-frontend_frontend_net}
+  bon_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.42.0.0/16

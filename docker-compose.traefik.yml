@@ -1,4 +1,4 @@
-# Usage avec Traefik (réseau partagé avec vos autres apps) :
+# Usage avec Traefik :
 #   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up --build -d
 #
 # Adapter le Host() et le nom du réseau Traefik selon votre infra.
@@ -6,7 +6,7 @@
 services:
   app:
     networks:
-      - frontend_net
+      - bon_net
       - traefik
     labels:
       - traefik.enable=true
