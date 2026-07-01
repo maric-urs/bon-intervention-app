@@ -1,29 +1,40 @@
+# Production — même modèle que dsiweb :
+# - pas de Traefik, pas de réseau NPM partagé
+# - port exposé sur l'hôte → Nginx Proxy Manager fait le HTTPS
+#
+# Déploiement :
+#   docker compose up -d --build
+#
+# HTTPS dans NPM (http://webapps:81) → Proxy Hosts → Add :
+#   Domain Names     : bons.agglo.local   (ou votre domaine)
+#   Scheme           : http
+#   Forward Hostname : 172.17.0.1         (gateway Docker) ou IP du serveur
+#   Forward Port     : 1899
+#   SSL              : Let's Encrypt ou certificat interne + Force SSL
+
 services:
   app:
     build: .
     container_name: bon-intervention-app
+    restart: unless-stopped
     ports:
-      - "1899:1899"
+      - "${HOST_PORT:-1899}:${PORT:-1899}"
     env_file:
       - .env
     environment:
       NODE_ENV: production
+      HOST: "0.0.0.0"
       DATABASE_URL: file:/data/prod.db
-      PORT: 1899
+      PORT: "${PORT:-1899}"
     volumes:
       - bon_data:/data
     networks:
       - bon_net
-    restart: unless-stopped
 
 volumes:
   bon_data:
 
-# HTTPS via Nginx Proxy Manager (stack revproxy) :
-#   docker compose -f docker-compose.yml -f docker-compose.npm.yml up -d --build
-#
-# Sous-réseau dédié (libre sur le serveur) :
-# utilisés ailleurs → 172.25.x (Appwrite), 172.31.x (DSI, docs…), 172.40.x (Orizon)
+# Sous-réseau dédié — 172.25.x Appwrite, 172.31.x DSI/docs, 172.40.x Orizon
 networks:
   bon_net:
     driver: bridge
