@@ -2,9 +2,15 @@
 set -e
 mkdir -p /data
 export DATABASE_URL="file:/data/prod.db"
-if [ ! -f /data/prod.db ]; then
-  echo ">> Initialisation base (véhicules, tarifs, centres)..."
-  npx prisma db push
+
+npx prisma db push
+
+# Seed si jamais fait (base vide créée au build Docker sans données)
+if [ ! -f /data/.seeded ]; then
+  echo ">> Chargement données initiales (véhicules, tarifs, centres)..."
   npx tsx prisma/seed.ts
+  touch /data/.seeded
+  echo ">> Seed terminé."
 fi
+
 exec "$@"
