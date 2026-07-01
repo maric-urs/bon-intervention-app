@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model MarcheConfig {
+  id            Int     @id @default(1)
+  reference     String  @default("25.061")
+  consultation  String  @default("")
+  maitreOuvrage String  @default("CACEM")
+  objet         String  @default("Fourniture de pneumatiques et services associés")
+  lot1Desc      String?
+  lot2Desc      String?
+  lot3Desc      String?
+  documents     String?
+}
+
+model Lot {
+  id          Int     @id @default(autoincrement())
+  code        String  @unique
+  description String?
+  ordre       Int     @default(0)
+  actif       Boolean @default(true)
+}
+
+model Centre {
+  id          Int      @id @default(autoincrement())
+  lot         String
+  lotsCouvert String?
+  nom         String   @unique
+  adresse   String
+  email     String
+  mobile    String?
+  fixe      String?
+  emailCc   String?
+  bons      BonIntervention[]
+}
+
+model Vehicle {
+  id              Int     @id @default(autoincrement())
+  immatriculation String
+  marque          String
+  modele          String
+  emplacement     String
+  dimension       String
+  lotSuggere      String
+  cleTarif        String
+
+  @@unique([immatriculation, emplacement])
+}
+
+model TarifPneu {
+  id                 Int      @id @default(autoincrement())
+  lot                String
+  refBpu             String
+  dimension          String
+  cleRecherche       String
+  marque             String?
+  classification     String?
+  prixNeufHt         Float?
+  remisePct          Float?
+  prixNeufRemiseHt   Float?
+  prixRechapeRemiseHt Float?
+}
+
+model TarifPrestation {
+  id           Int    @id @default(autoincrement())
+  lot          String
+  prestation   String
+  prixHt       Float
+  remisePct    Float
+  prixRemiseHt Float
+
+  @@unique([lot, prestation])
+}
+
+model BonIntervention {
+  id            Int       @id @default(autoincrement())
+  numeroBon     String    @unique
+  numeroEngagement String?
+  lot           String
+  marche        String    @default("25.061")
+  dateBon       DateTime  @default(now())
+  demandeur     String?
+  kilometrage   Int?
+  statut        String    @default("BROUILLON")
+  immatriculation String
+  marque        String
+  modele        String
+  centreId      Int
+  centre        Centre    @relation(fields: [centreId], references: [id])
+  totalHt       Float     @default(0)
+  lignes        LignePrestation[]
+  historique    HistoriqueStatut[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  envoyeAt      DateTime?
+  notes         String?
+}
+
+model LignePrestation {
+  id          Int             @id @default(autoincrement())
+  bonId       Int
+  bon         BonIntervention @relation(fields: [bonId], references: [id], onDelete: Cascade)
+  ordre       Int
+  type        String
+  prestation  String?
+  emplacement String
+  dimension   String
+  quantite    Int             @default(1)
+  prixUnitHt  Float?
+  totalHt     Float?
+  refBpu      String?
+}
+
+model HistoriqueStatut {
+  id        Int             @id @default(autoincrement())
+  bonId     Int
+  bon       BonIntervention @relation(fields: [bonId], references: [id], onDelete: Cascade)
+  statut    String
+  commentaire String?
+  createdAt DateTime        @default(now())
+}

@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "1899:1899"
+    volumes:
+      - bon_data:/data
+    environment:
+      - DATABASE_URL=file:/data/prod.db
+      - PORT=1899
+    restart: unless-stopped
+
+volumes:
+  bon_data:
