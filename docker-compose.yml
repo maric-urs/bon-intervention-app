@@ -1,14 +1,27 @@
 services:
   app:
     build: .
+    container_name: bon-intervention-app
     ports:
       - "1899:1899"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: file:/data/prod.db
+      PORT: 1899
     volumes:
       - bon_data:/data
-    environment:
-      - DATABASE_URL=file:/data/prod.db
-      - PORT=1899
+    networks:
+      - frontend_net
     restart: unless-stopped
 
 volumes:
   bon_data:
+
+networks:
+  frontend_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.40.0.0/16

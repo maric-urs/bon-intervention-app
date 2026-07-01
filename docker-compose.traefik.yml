@@ -1,15 +1,16 @@
-# Usage avec Traefik :
+# Usage avec Traefik (réseau partagé avec vos autres apps) :
 #   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up --build -d
 #
-# Adapter Host(), entrypoints et le nom du réseau selon l'infra de votre partenaire.
+# Adapter le Host() et le nom du réseau Traefik selon votre infra.
 
 services:
   app:
     networks:
-      - default
+      - frontend_net
       - traefik
     labels:
       - traefik.enable=true
+      - traefik.docker.network=traefik
       - traefik.http.routers.bon-intervention.rule=Host(`bon-intervention.example.com`)
       - traefik.http.routers.bon-intervention.entrypoints=websecure
       - traefik.http.routers.bon-intervention.tls=true
