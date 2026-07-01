@@ -9,9 +9,8 @@ RUN npm ci --ignore-scripts 2>/dev/null || npm install --ignore-scripts
 
 COPY . .
 ENV DATABASE_URL="file:/data/prod.db"
-RUN npx prisma generate && npm run build
-
 RUN mkdir -p /data
+RUN npx prisma generate && npx prisma db push && npm run build
 VOLUME ["/data"]
 EXPOSE 1899
 ENV PORT=1899
