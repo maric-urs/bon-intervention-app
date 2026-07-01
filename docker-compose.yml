@@ -19,9 +19,9 @@ services:
 volumes:
   bon_data:
 
+# Réutilise le réseau Orizon (évite le conflit de subnet 172.40.0.0/16).
+# Vérifier le nom exact : docker network ls | grep frontend
 networks:
   frontend_net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.40.0.0/16
+    external: true
+    name: ${FRONTEND_NETWORK:-frontend_frontend_net}
