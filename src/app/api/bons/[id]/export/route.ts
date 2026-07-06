@@ -21,7 +21,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       },
     });
   } catch (e) {
+    const message = e instanceof Error ? e.message : "Erreur inconnue";
     console.error("Export bon PDF:", e);
-    return NextResponse.json({ error: "Échec de l'export PDF" }, { status: 500 });
+    return NextResponse.json({ error: "Échec de l'export PDF", detail: message }, { status: 500 });
   }
 }

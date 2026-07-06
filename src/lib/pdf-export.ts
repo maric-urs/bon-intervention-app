@@ -1,12 +1,21 @@
 import PDFDocument from "pdfkit";
+import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
 
-const LOGO_PATH = path.join(process.cwd(), "assets", "cacem-logo.png");
 const YELLOW = "#FFFF00";
 const GRAY = "#D9D9D9";
 const RED = "#C00000";
 const BORDER = "#000000";
+
+function resolveLogoPath(): string | null {
+  const candidates = [
+    path.join(process.cwd(), "assets", "cacem-logo.png"),
+    path.join(process.cwd(), "..", "assets", "cacem-logo.png"),
+    path.join(__dirname, "..", "..", "assets", "cacem-logo.png"),
+  ];
+  return candidates.find((p) => fs.existsSync(p)) ?? null;
+}
 
 type BonPdf = NonNullable<Awaited<ReturnType<typeof fetchBon>>>;
 
@@ -43,14 +52,17 @@ function ligneLabel(l: BonPdf["lignes"][number]) {
 }
 
 function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
+  doc.strokeColor(BORDER).lineWidth(0.75);
+
   const pageW = doc.page.width;
   const margin = 40;
   const contentW = pageW - margin * 2;
 
   // —— En-tête ——
-  try {
-    doc.image(LOGO_PATH, margin, 36, { width: 155 });
-  } catch {
+  const logoPath = resolveLogoPath();
+  if (logoPath) {
+    doc.image(logoPath, margin, 36, { width: 155 });
+  } else {
     doc.font("Helvetica-Bold").fontSize(14).text("CACEM", margin, 45);
   }
 
@@ -146,7 +158,7 @@ function drawLabelTable(
 
   let cy = y + headerH;
   for (const row of rows) {
-    doc.rect(x, cy, labelW, rowH).stroke(BORDER);
+    doc.rect(x, cy, labelW, rowH).stroke();
     doc.rect(x + labelW, cy, valueW, rowH).fillAndStroke(YELLOW, BORDER);
     doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000");
     doc.text(row.label, x + 5, cy + 8, { width: labelW - 10 });
@@ -178,19 +190,19 @@ function drawInterventionTable(
   const maxRows = 3;
   for (let i = 0; i < maxRows; i++) {
     const ligne = lignes[i];
-    doc.rect(x, cy, labelW, rowH).stroke(BORDER);
+    doc.rect(x, cy, labelW, rowH).stroke();
     if (ligne) {
       doc.rect(x + labelW, cy, valueW, rowH).fillAndStroke(YELLOW, BORDER);
       doc.font("Helvetica").fontSize(9).fillColor("#000000");
       const txt = `${ligneLabel(ligne)} — ${formatPrix(ligne.prixUnitHt)}`;
       doc.text(txt, x + labelW + 4, cy + 8, { width: valueW - 8 });
     } else {
-      doc.rect(x + labelW, cy, valueW, rowH).stroke(BORDER);
+      doc.rect(x + labelW, cy, valueW, rowH).stroke();
     }
     cy += rowH;
   }
 
-  doc.rect(x, cy, labelW, rowH).stroke(BORDER);
+  doc.rect(x, cy, labelW, rowH).stroke();
   doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000");
   doc.text("PRIX", x + 5, cy + 8, { width: labelW - 10 });
   doc.rect(x + labelW, cy, valueW, rowH).fillAndStroke(YELLOW, BORDER);
