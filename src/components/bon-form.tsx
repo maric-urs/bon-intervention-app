@@ -8,18 +8,25 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { cn, formatEuro } from "@/lib/utils";
 import { filterCentresParLot, INPUT_TARIF_MATCH } from "@/lib/tarif-utils";
 import { LotSelect } from "@/components/lot-select";
-import { Mail, Save } from "lucide-react";
+import { Mail, Plus, Save, Trash2 } from "lucide-react";
 
 type Centre = { id: number; nom: string; lot: string; lotsCouvert?: string | null; email: string; emailCc: string | null };
 type Lot = { code: string };
 type Immat = { immatriculation: string; marque: string; modele: string; lotSuggere: string };
 type Prestation = { lot: string; prestation: string; prixRemiseHt: number };
-type VehicleLine = {
+type PneuLine = {
   emplacement: string;
   dimension: string;
   cleTarif: string;
   prixUnitHt: number | null;
   refBpu: string | null;
+  selected: boolean;
+};
+type ExtraPrestationLine = {
+  id: string;
+  prestation: string;
+  prixUnitHt: number;
+  quantite: number;
 };
 
 type Props = {
@@ -38,11 +45,18 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
   const [demandeur, setDemandeur] = useState("");
   const [kilometrage, setKilometrage] = useState("");
   const [lot, setLot] = useState(defaultLot);
-  const [lines, setLines] = useState<VehicleLine[]>([]);
+  const [pneuLines, setPneuLines] = useState<PneuLine[]>([]);
+  const [extraPrestations, setExtraPrestations] = useState<ExtraPrestationLine[]>([]);
+  const [addPrestaKey, setAddPrestaKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const selected = immatriculations.find((i) => i.immatriculation === immat);
+
+  const prestationsLot = useMemo(
+    () => prestations.filter((p) => p.lot === lot),
+    [prestations, lot]
+  );
 
   const centresDisponibles = useMemo(() => {
     if (!immat) return centres;
@@ -63,6 +77,8 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
   function onLotChange(value: string) {
     setLot(value);
     setCentreId("");
+    setExtraPrestations([]);
+    setAddPrestaKey("");
   }
 
   useEffect(() => {
@@ -76,29 +92,104 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
 
   useEffect(() => {
     if (!immat) {
-      setLines([]);
+      setPneuLines([]);
       return;
     }
     fetch(`/api/vehicles/${encodeURIComponent(immat)}?lot=${encodeURIComponent(lot)}`)
       .then((r) => r.json())
-      .then(setLines)
-      .catch(() => setLines([]));
+      .then((rows: Omit<PneuLine, "selected">[]) =>
+        setPneuLines(rows.map((l) => ({ ...l, selected: true })))
+      )
+      .catch(() => setPneuLines([]));
   }, [immat, lot]);
 
-  const total = useMemo(
-    () => lines.reduce((s, l) => s + (l.prixUnitHt || 0), 0),
-    [lines]
-  );
+  function togglePneu(emplacement: string) {
+    setPneuLines((prev) =>
+      prev.map((l) => (l.emplacement === emplacement ? { ...l, selected: !l.selected } : l))
+    );
+  }
+
+  function addPrestation() {
+    if (!addPrestaKey) return;
+    const tarif = prestationsLot.find((p) => p.prestation === addPrestaKey);
+    if (!tarif) return;
+    if (extraPrestations.some((e) => e.prestation === tarif.prestation)) return;
+    setExtraPrestations((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${tarif.prestation}`,
+        prestation: tarif.prestation,
+        prixUnitHt: tarif.prixRemiseHt,
+        quantite: 1,
+      },
+    ]);
+    setAddPrestaKey("");
+  }
+
+  function removePrestation(id: string) {
+    setExtraPrestations((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  const selectedPneus = useMemo(() => pneuLines.filter((l) => l.selected), [pneuLines]);
+
+  const total = useMemo(() => {
+    const pneuTotal = selectedPneus.reduce((s, l) => s + (l.prixUnitHt || 0), 0);
+    const prestaTotal = extraPrestations.reduce((s, l) => s + l.prixUnitHt * l.quantite, 0);
+    return pneuTotal + prestaTotal;
+  }, [selectedPneus, extraPrestations]);
 
   const lotTarifOk = useMemo(
     () =>
-      lines.length > 0 &&
-      lines.every((l) => !l.dimension?.trim() || l.prixUnitHt != null),
-    [lines]
+      selectedPneus.length > 0 &&
+      selectedPneus.every((l) => !l.dimension?.trim() || l.prixUnitHt != null),
+    [selectedPneus]
   );
+
+  function buildLignesPayload() {
+    const lignes: Array<{
+      type: string;
+      prestation?: string;
+      emplacement: string;
+      dimension: string;
+      quantite: number;
+      prixUnitHt: number | null;
+      refBpu: string | null;
+    }> = [];
+
+    for (const l of selectedPneus) {
+      lignes.push({
+        type: "Pneumatique neuf",
+        emplacement: l.emplacement,
+        dimension: l.dimension,
+        quantite: 1,
+        prixUnitHt: l.prixUnitHt,
+        refBpu: l.refBpu,
+      });
+    }
+
+    for (const l of extraPrestations) {
+      lignes.push({
+        type: "Prestation",
+        prestation: l.prestation,
+        emplacement: "—",
+        dimension: "—",
+        quantite: l.quantite,
+        prixUnitHt: l.prixUnitHt,
+        refBpu: null,
+      });
+    }
+
+    return lignes.map((l, i) => ({ ...l, ordre: i + 1 }));
+  }
 
   async function handleSubmit(andMail = false) {
     setError("");
+    const lignes = buildLignesPayload();
+    if (lignes.length === 0) {
+      setError("Sélectionnez au moins un pneu ou ajoutez une prestation");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/bons", {
@@ -113,15 +204,7 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
           numeroEngagement: engagement,
           demandeur,
           kilometrage: kilometrage ? Number(kilometrage) : null,
-          lignes: lines.map((l, i) => ({
-            ordre: i + 1,
-            type: "Pneumatique neuf",
-            emplacement: l.emplacement,
-            dimension: l.dimension,
-            quantite: 1,
-            prixUnitHt: l.prixUnitHt,
-            refBpu: l.refBpu,
-          })),
+          lignes,
           markEnvoye: andMail,
         }),
       });
@@ -180,17 +263,6 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
                   </option>
                 ))}
             </Select>
-            {!immat && (
-              <p className="text-xs text-muted-foreground">
-                Choisissez une immatriculation — les centres seront filtrés selon le lot du véhicule
-              </p>
-            )}
-            {immat && (
-              <p className="text-xs text-muted-foreground">
-                {centresDisponibles.length} centre{centresDisponibles.length > 1 ? "s" : ""} pour le{" "}
-                <strong>{lot}</strong>
-              </p>
-            )}
           </div>
           <div className="space-y-2">
             <Label>N° engagement</Label>
@@ -212,35 +284,94 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Prestations pneus</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {lines.length === 0 && (
-            <p className="text-sm text-muted-foreground">Choisissez une immatriculation</p>
-          )}
-          {lines.map((l) => (
-            <div
-              key={l.emplacement}
-              className={cn(
-                "rounded-lg border p-3 text-sm",
-                l.dimension?.trim() && l.prixUnitHt != null && "border-green-500 bg-green-50 dark:bg-green-950/40"
-              )}
-            >
-              <div className="font-medium">{l.emplacement}</div>
-              <div className={cn("text-muted-foreground", l.prixUnitHt != null && "text-green-800 dark:text-green-200")}>
-                {l.dimension || "—"}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Pneus</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pneuLines.length === 0 && (
+              <p className="text-sm text-muted-foreground">Choisissez une immatriculation</p>
+            )}
+            {pneuLines.map((l) => (
+              <label
+                key={l.emplacement}
+                className={cn(
+                  "flex cursor-pointer gap-3 rounded-lg border p-3 text-sm transition-colors",
+                  l.selected && l.dimension?.trim() && l.prixUnitHt != null && "border-green-500 bg-green-50 dark:bg-green-950/40",
+                  !l.selected && "opacity-60"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={l.selected}
+                  onChange={() => togglePneu(l.emplacement)}
+                />
+                <div className="flex-1">
+                  <div className="font-medium">{l.emplacement}</div>
+                  <div className={cn("text-muted-foreground", l.selected && l.prixUnitHt != null && "text-green-800 dark:text-green-200")}>
+                    {l.dimension || "—"}
+                  </div>
+                  {l.selected && (
+                    <div className="mt-1 font-semibold text-[#1F4E79]">{formatEuro(l.prixUnitHt)}</div>
+                  )}
+                </div>
+              </label>
+            ))}
+            {pneuLines.length > 0 && (
+              <p className="text-xs text-muted-foreground">Décochez AVANT ou ARRIÈRE si non concerné</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Autres prestations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!immat && <p className="text-sm text-muted-foreground">Choisissez une immatriculation</p>}
+            {immat && prestationsLot.length === 0 && (
+              <p className="text-sm text-muted-foreground">Aucune prestation BPU pour le {lot}</p>
+            )}
+            {immat && prestationsLot.length > 0 && (
+              <div className="flex gap-2">
+                <Select className="flex-1" value={addPrestaKey} onChange={(e) => setAddPrestaKey(e.target.value)}>
+                  <option value="">— Prestation —</option>
+                  {prestationsLot
+                    .filter((p) => !extraPrestations.some((e) => e.prestation === p.prestation))
+                    .map((p) => (
+                      <option key={p.prestation} value={p.prestation}>
+                        {p.prestation} — {formatEuro(p.prixRemiseHt)}
+                      </option>
+                    ))}
+                </Select>
+                <Button type="button" variant="outline" size="sm" onClick={addPrestation} disabled={!addPrestaKey}>
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="mt-1 font-semibold text-[#1F4E79]">{formatEuro(l.prixUnitHt)}</div>
-            </div>
-          ))}
-          <div className="border-t pt-3 flex justify-between font-semibold">
+            )}
+            {extraPrestations.map((l) => (
+              <div key={l.id} className="flex items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{l.prestation}</div>
+                  <div className="text-[#1F4E79] font-semibold">{formatEuro(l.prixUnitHt)}</div>
+                </div>
+                <Button type="button" variant="ghost" size="sm" onClick={() => removePrestation(l.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6 flex justify-between font-semibold">
             <span>Total HT</span>
             <span>{formatEuro(total)}</span>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {error && <p className="text-destructive text-sm lg:col-span-3">{error}</p>}
 

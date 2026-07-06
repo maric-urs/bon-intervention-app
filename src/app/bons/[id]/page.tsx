@@ -68,8 +68,8 @@ export default async function BonDetailPage({ params }: { params: Promise<{ id: 
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
-                <th className="pb-2 pr-4">Emp.</th>
-                <th className="pb-2 pr-4">Dimension</th>
+                <th className="pb-2 pr-4">Type</th>
+                <th className="pb-2 pr-4">Détail</th>
                 <th className="pb-2 pr-4">Qté</th>
                 <th className="pb-2 pr-4 text-right">Prix unit.</th>
                 <th className="pb-2 text-right">Total</th>
@@ -78,8 +78,10 @@ export default async function BonDetailPage({ params }: { params: Promise<{ id: 
             <tbody>
               {bon.lignes.map((l) => (
                 <tr key={l.id} className="border-b last:border-0">
-                  <td className="py-2 pr-4">{l.emplacement}</td>
-                  <td className="py-2 pr-4">{l.dimension}</td>
+                  <td className="py-2 pr-4">{l.type}</td>
+                  <td className="py-2 pr-4">
+                    {l.prestation ? l.prestation : `${l.emplacement} — ${l.dimension}`}
+                  </td>
                   <td className="py-2 pr-4">{l.quantite}</td>
                   <td className="py-2 pr-4 text-right">{formatEuro(l.prixUnitHt)}</td>
                   <td className="py-2 text-right">{formatEuro(l.totalHt)}</td>
@@ -127,14 +129,18 @@ function buildMail(bon: {
   kilometrage: number | null;
   demandeur: string | null;
   totalHt: number;
-  lignes: Array<{ emplacement: string; dimension: string; prixUnitHt: number | null }>;
+  lignes: Array<{ prestation: string | null; emplacement: string; dimension: string; prixUnitHt: number | null }>;
 }) {
   let t = "Bonjour,\n\nBon d'intervention marché CACEM 25.061.\n\n";
   t += `N° bon : ${bon.numeroBon}\nEngagement : ${bon.numeroEngagement || ""}\n`;
   t += `Lot : ${bon.lot}\nCentre : ${bon.centre.nom}\n`;
   t += `Immat : ${bon.immatriculation} (${bon.marque} ${bon.modele})\n\n`;
   for (const l of bon.lignes) {
-    t += `${l.emplacement} — ${l.dimension} — ${l.prixUnitHt ?? 0} EUR HT\n`;
+    if (l.prestation) {
+      t += `${l.prestation} — ${l.prixUnitHt ?? 0} EUR HT\n`;
+    } else {
+      t += `${l.emplacement} — ${l.dimension} — ${l.prixUnitHt ?? 0} EUR HT\n`;
+    }
   }
   t += `\nTotal HT : ${bon.totalHt.toFixed(2)} EUR\n`;
   return t;

@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
     const lignes = (body.lignes || []) as Array<{
       ordre: number;
       type: string;
+      prestation?: string | null;
       emplacement: string;
       dimension: string;
       quantite: number;
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
           create: lignes.map((l) => ({
             ordre: l.ordre,
             type: l.type,
+            prestation: l.prestation || null,
             emplacement: l.emplacement,
             dimension: l.dimension,
             quantite: l.quantite,
@@ -94,6 +96,8 @@ function buildEmailBody(
     demandeur: string | null;
     totalHt: number;
     lignes: Array<{
+      type: string;
+      prestation: string | null;
       emplacement: string;
       dimension: string;
       quantite: number;
@@ -112,7 +116,11 @@ function buildEmailBody(
   t += `Kilométrage : ${bon.kilometrage ?? ""}\n\n`;
   t += "PRESTATIONS :\n";
   for (const l of bon.lignes) {
-    t += `- ${l.emplacement} | ${l.dimension} | ${l.prixUnitHt ?? 0} EUR HT\n`;
+    if (l.prestation) {
+      t += `- ${l.prestation} | ${l.prixUnitHt ?? 0} EUR HT\n`;
+    } else {
+      t += `- ${l.emplacement} | ${l.dimension} | ${l.prixUnitHt ?? 0} EUR HT\n`;
+    }
   }
   t += `\nTOTAL HT : ${bon.totalHt.toFixed(2)} EUR\n\n`;
   t += "À faire figurer sur la facture : immatriculation, n° engagement, n° bon.\n\n";
