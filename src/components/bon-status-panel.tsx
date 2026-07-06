@@ -6,21 +6,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, Label, Textarea } from "@/components/ui/input";
 import { STATUTS, STATUT_LABELS } from "@/lib/utils";
+import { downloadBonEmail } from "@/lib/download-bon-email";
 import { Mail, Download } from "lucide-react";
 
 export function BonStatusPanel({
   bonId,
   currentStatut,
-  mailto,
 }: {
   bonId: number;
   currentStatut: string;
-  mailto: string;
 }) {
   const router = useRouter();
   const [statut, setStatut] = useState(currentStatut);
   const [commentaire, setCommentaire] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+
+  async function openOutlook() {
+    setEmailLoading(true);
+    try {
+      await downloadBonEmail(bonId);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur lors de la préparation de l'email");
+    } finally {
+      setEmailLoading(false);
+    }
+  }
 
   async function updateStatut() {
     setLoading(true);
@@ -39,10 +50,13 @@ export function BonStatusPanel({
         <CardTitle>Actions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Button className="w-full" variant="secondary" onClick={() => (window.location.href = mailto)}>
+        <Button className="w-full" variant="secondary" onClick={openOutlook} disabled={emailLoading}>
           <Mail className="h-4 w-4" />
-          Ouvrir dans Outlook
+          {emailLoading ? "Préparation…" : "Préparer l'email Outlook"}
         </Button>
+        <p className="text-xs text-muted-foreground">
+          Télécharge un fichier .eml à ouvrir dans Outlook (PDF en pièce jointe).
+        </p>
         <a
           href={`/api/bons/${bonId}/export`}
           className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent"

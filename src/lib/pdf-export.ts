@@ -95,15 +95,8 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
 
   // —— Titre + métadonnées ——
   const titleY = 118;
-  doc.font(FONT_BOLD).fontSize(18);
   const titleText = "BON D'INTERVENTION N°";
-  doc.text(titleText, margin, titleY);
-
-  const numBoxX = margin + doc.widthOfString(titleText) + 10;
-  const numBoxW = Math.min(130, rightColX - numBoxX - 8);
-  drawYellowCell(doc, numBoxX, titleY - 3, numBoxW, 24);
-  doc.font(FONT_BOLD).fontSize(13);
-  doc.text(bon.numeroBon, numBoxX + 4, titleY + 2, { width: numBoxW - 8, align: "center" });
+  const headerBottom = drawNumeroBonHeader(doc, bon.numeroBon, margin, titleY, titleText, rightColX - 12);
 
   doc.font(FONT).fontSize(11);
   doc.text(`Date : ${formatDateFr(bon.dateBon)}`, contactX, titleY, { width: contactW, align: "right" });
@@ -113,17 +106,23 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
   const lotBoxW = 58;
   const lotBoxX = pageW - margin - lotBoxW;
   const lotLabelX = lotBoxX - doc.widthOfString(lotLabel) - 6;
-  doc.text(lotLabel, lotLabelX, titleY + 32);
-  drawYellowCell(doc, lotBoxX, titleY + 28, lotBoxW, 20);
-  doc.text(formatLot(bon.lot), lotBoxX + 2, titleY + 32, { width: lotBoxW - 4, align: "center" });
+  const lotY = titleY + 32;
+  doc.text(lotLabel, lotLabelX, lotY);
+  drawYellowCell(doc, lotBoxX, lotY - 4, lotBoxW, 20);
+  doc.text(formatLot(bon.lot), lotBoxX + 2, lotY, { width: lotBoxW - 4, align: "center", lineBreak: false });
 
+  let metaBottom = titleY + 52;
   if (bon.numeroEngagement) {
     doc.font(FONT).fontSize(10);
-    doc.text(`N° engagement : ${bon.numeroEngagement}`, margin, titleY + 34);
+    doc.text(`N° engagement : ${bon.numeroEngagement}`, margin, titleY + 52, {
+      width: rightColX - margin - 8,
+      lineBreak: false,
+    });
+    metaBottom = titleY + 66;
   }
 
   // —— VEHICULE ——
-  let y = 178;
+  let y = Math.max(headerBottom, metaBottom) + 14;
   y = drawLabelTable(doc, margin, y, contentW, "VEHICULE", [
     { label: "IMMATRICULATION", value: bon.immatriculation },
     { label: "MARQUE", value: bon.marque },
@@ -187,6 +186,55 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
     footerY + 72,
     { width: contentW }
   );
+}
+
+/** Titre + case jaune du n° de bon, sans retour à la ligne parasite. */
+function drawNumeroBonHeader(
+  doc: PDFKit.PDFDocument,
+  numero: string,
+  margin: number,
+  titleY: number,
+  titleText: string,
+  maxRight: number
+): number {
+  const boxH = 24;
+  const hPad = 12;
+
+  doc.font(FONT_BOLD).fontSize(18);
+  doc.text(titleText, margin, titleY);
+  const titleEndX = margin + doc.widthOfString(titleText);
+  const inlineMaxW = maxRight - titleEndX - 10;
+
+  let fontSize = 13;
+  doc.font(FONT_BOLD);
+  while (fontSize >= 8) {
+    doc.fontSize(fontSize);
+    const textW = doc.widthOfString(numero);
+    const boxW = textW + hPad;
+    if (boxW <= inlineMaxW) {
+      const numBoxX = titleEndX + 10;
+      drawYellowCell(doc, numBoxX, titleY - 3, boxW, boxH);
+      doc.text(numero, numBoxX + hPad / 2, titleY + 2, {
+        width: boxW - hPad,
+        align: "center",
+        lineBreak: false,
+      });
+      return titleY + boxH;
+    }
+    fontSize -= 0.5;
+  }
+
+  // Numéro trop long pour la ligne du titre : case dédiée en dessous
+  const stackY = titleY + 26;
+  doc.font(FONT_BOLD).fontSize(12);
+  const boxW = Math.min(doc.widthOfString(numero) + hPad, maxRight - margin);
+  drawYellowCell(doc, margin, stackY, boxW, boxH);
+  doc.text(numero, margin + hPad / 2, stackY + 5, {
+    width: boxW - hPad,
+    align: "left",
+    lineBreak: false,
+  });
+  return stackY + boxH;
 }
 
 function drawYellowCell(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number) {

@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
-import { cn, formatEuro } from "@/lib/utils";
+import { cn, formatEuro, QUANTITE_PNEUS_PAR_EMPACEMENT } from "@/lib/utils";
 import { filterCentresParLot, INPUT_TARIF_MATCH } from "@/lib/tarif-utils";
 import { LotSelect } from "@/components/lot-select";
 import { Mail, Plus, Save, Trash2 } from "lucide-react";
+import { downloadBonEmail } from "@/lib/download-bon-email";
 
 type Centre = { id: number; nom: string; lot: string; lotsCouvert?: string | null; email: string; emailCc: string | null };
 type Lot = { code: string };
@@ -133,7 +134,10 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
   const selectedPneus = useMemo(() => pneuLines.filter((l) => l.selected), [pneuLines]);
 
   const total = useMemo(() => {
-    const pneuTotal = selectedPneus.reduce((s, l) => s + (l.prixUnitHt || 0), 0);
+    const pneuTotal = selectedPneus.reduce(
+      (s, l) => s + (l.prixUnitHt || 0) * QUANTITE_PNEUS_PAR_EMPACEMENT,
+      0
+    );
     const prestaTotal = extraPrestations.reduce((s, l) => s + l.prixUnitHt * l.quantite, 0);
     return pneuTotal + prestaTotal;
   }, [selectedPneus, extraPrestations]);
@@ -161,7 +165,7 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
         type: "Pneumatique neuf",
         emplacement: l.emplacement,
         dimension: l.dimension,
-        quantite: 1,
+        quantite: QUANTITE_PNEUS_PAR_EMPACEMENT,
         prixUnitHt: l.prixUnitHt,
         refBpu: l.refBpu,
       });
@@ -210,7 +214,9 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur");
-      if (andMail && data.mailto) window.location.href = data.mailto;
+      if (andMail && data.openEmail) {
+        await downloadBonEmail(data.id);
+      }
       router.push(`/bons/${data.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
@@ -313,14 +319,19 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
                   <div className={cn("text-muted-foreground", l.selected && l.prixUnitHt != null && "text-green-800 dark:text-green-200")}>
                     {l.dimension || "—"}
                   </div>
-                  {l.selected && (
-                    <div className="mt-1 font-semibold text-[#1F4E79]">{formatEuro(l.prixUnitHt)}</div>
+                  {l.selected && l.prixUnitHt != null && (
+                    <div className="mt-1 font-semibold text-[#1F4E79]">
+                      {formatEuro(l.prixUnitHt)} × {QUANTITE_PNEUS_PAR_EMPACEMENT} ={" "}
+                      {formatEuro(l.prixUnitHt * QUANTITE_PNEUS_PAR_EMPACEMENT)}
+                    </div>
                   )}
                 </div>
               </label>
             ))}
             {pneuLines.length > 0 && (
-              <p className="text-xs text-muted-foreground">Décochez AVANT ou ARRIÈRE si non concerné</p>
+              <p className="text-xs text-muted-foreground">
+                Décochez AVANT ou ARRIÈRE si non concerné — {QUANTITE_PNEUS_PAR_EMPACEMENT} pneus par essieu
+              </p>
             )}
           </CardContent>
         </Card>
@@ -382,7 +393,7 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
         </Button>
         <Button variant="secondary" onClick={() => handleSubmit(true)} disabled={loading || !immat || !centreId}>
           <Mail className="h-4 w-4" />
-          Enregistrer et ouvrir Outlook
+          Enregistrer et préparer l&apos;email Outlook
         </Button>
       </div>
     </div>

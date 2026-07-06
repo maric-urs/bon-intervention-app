@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatDate, formatEuro, STATUT_LABELS, STATUT_COLORS, buildMailtoUrl, type Statut } from "@/lib/utils";
+import { formatDate, formatEuro, STATUT_LABELS, STATUT_COLORS, type Statut } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/input";
 import { BonStatusPanel } from "@/components/bon-status-panel";
@@ -15,14 +15,6 @@ export default async function BonDetailPage({ params }: { params: Promise<{ id: 
     include: { centre: true, lignes: { orderBy: { ordre: "asc" } }, historique: { orderBy: { createdAt: "desc" } } },
   });
   if (!bon) notFound();
-
-  const mailBody = buildMail(bon);
-  const mailto = buildMailtoUrl({
-    to: bon.centre.email,
-    cc: bon.centre.emailCc || "lbarru@citadelle-sa.com",
-    subject: `Bon d'intervention ${bon.numeroBon} - Marché 25.061 - ${bon.immatriculation}`,
-    body: mailBody,
-  });
 
   return (
     <div className="space-y-6">
@@ -57,7 +49,7 @@ export default async function BonDetailPage({ params }: { params: Promise<{ id: 
           </CardContent>
         </Card>
 
-        <BonStatusPanel bonId={bon.id} currentStatut={bon.statut} mailto={mailto} />
+        <BonStatusPanel bonId={bon.id} currentStatut={bon.statut} />
       </div>
 
       <Card>
@@ -116,32 +108,4 @@ export default async function BonDetailPage({ params }: { params: Promise<{ id: 
       </Card>
     </div>
   );
-}
-
-function buildMail(bon: {
-  numeroBon: string;
-  numeroEngagement: string | null;
-  lot: string;
-  centre: { nom: string };
-  immatriculation: string;
-  marque: string;
-  modele: string;
-  kilometrage: number | null;
-  demandeur: string | null;
-  totalHt: number;
-  lignes: Array<{ prestation: string | null; emplacement: string; dimension: string; prixUnitHt: number | null }>;
-}) {
-  let t = "Bonjour,\n\nBon d'intervention marché CACEM 25.061.\n\n";
-  t += `N° bon : ${bon.numeroBon}\nEngagement : ${bon.numeroEngagement || ""}\n`;
-  t += `Lot : ${bon.lot}\nCentre : ${bon.centre.nom}\n`;
-  t += `Immat : ${bon.immatriculation} (${bon.marque} ${bon.modele})\n\n`;
-  for (const l of bon.lignes) {
-    if (l.prestation) {
-      t += `${l.prestation} — ${l.prixUnitHt ?? 0} EUR HT\n`;
-    } else {
-      t += `${l.emplacement} — ${l.dimension} — ${l.prixUnitHt ?? 0} EUR HT\n`;
-    }
-  }
-  t += `\nTotal HT : ${bon.totalHt.toFixed(2)} EUR\n`;
-  return t;
 }

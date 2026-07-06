@@ -14,6 +14,9 @@ export function formatDate(d: Date | string) {
   return new Intl.DateTimeFormat("fr-FR").format(new Date(d));
 }
 
+/** Nombre de pneus remplacés par essieu (AVANT ou ARRIÈRE). */
+export const QUANTITE_PNEUS_PAR_EMPACEMENT = 2;
+
 export function generateNumeroBon(seq: number) {
   const d = new Date();
   const ymd =
@@ -58,9 +61,9 @@ export function buildMailtoUrl(opts: {
   subject: string;
   body: string;
 }) {
-  const q = new URLSearchParams();
-  if (opts.cc) q.set("cc", opts.cc);
-  q.set("subject", opts.subject);
-  q.set("body", opts.body);
-  return `mailto:${encodeURIComponent(opts.to)}?${q.toString()}`;
+  const parts: string[] = [];
+  if (opts.cc) parts.push(`cc=${encodeURIComponent(opts.cc)}`);
+  parts.push(`subject=${encodeURIComponent(opts.subject)}`);
+  parts.push(`body=${encodeURIComponent(opts.body)}`);
+  return `mailto:${opts.to}?${parts.join("&")}`;
 }
