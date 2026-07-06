@@ -48,7 +48,7 @@ export function BonStatusPanel({
           className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
         >
           <Download className="h-4 w-4" />
-          Télécharger le bon (.xlsx)
+          Télécharger le bon (.pdf)
         </a>
         <div className="space-y-2">
           <Label>Changer le statut</Label>
