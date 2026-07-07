@@ -133,12 +133,12 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
   }
 
   const totalY = drawMontantTotal(doc, margin, noteY + 10, contentW, bon.totalHt);
-  const footerY = totalY + 24;
 
   // —— Pied de page ——
+  let footerY = totalY + 24;
   doc.font(FONT_BOLD).fontSize(11).fillColor(RED);
   doc.text("VEUILLEZ FAIRE APPARAITRE SUR VOTRE FACTURE :", margin, footerY);
-  doc.font(FONT).fontSize(11);
+  doc.font(FONT).fontSize(11).fillColor("#000000");
   doc.text("le n° d'immatriculation", margin, footerY + 18);
   doc.text("le n° Engagement", margin, footerY + 34);
   doc.text("le n° du bon d'intervention", margin, footerY + 50);
@@ -150,6 +150,8 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
     footerY + 72,
     { width: contentW }
   );
+
+  drawSignatureBlock(doc, margin, footerY + 96, contentW, bon);
 }
 
 /** Titre + case du n° de bon, sans retour à la ligne parasite. */
@@ -342,6 +344,46 @@ function drawMontantTotal(
   });
 
   return y + h;
+}
+
+function drawSignatureBlock(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  w: number,
+  bon: BonPdf
+) {
+  const gap = 20;
+  const boxW = (w - gap) / 2;
+  const labelH = 16;
+  const signH = 64;
+
+  const blocks = [
+    {
+      title: "Signature du prestataire",
+      subtitle: bon.centre.nom,
+      dateLabel: "Date :",
+    },
+    {
+      title: "Visa CACEM",
+      subtitle: bon.demandeur || "Nom et qualité du signataire",
+      dateLabel: "Date :",
+    },
+  ];
+
+  let maxBottom = y;
+  blocks.forEach((block, i) => {
+    const bx = x + i * (boxW + gap);
+    doc.font(FONT_BOLD).fontSize(10).fillColor("#000000");
+    doc.text(block.title, bx, y, { width: boxW, align: "center" });
+    drawValueCell(doc, bx, y + labelH, boxW, signH);
+    doc.font(FONT).fontSize(9).fillColor("#444444");
+    doc.text(block.subtitle, bx + 6, y + labelH + signH + 6, { width: boxW - 12, align: "center" });
+    doc.text(block.dateLabel, bx + 8, y + labelH + signH + 22, { width: boxW - 16 });
+    maxBottom = Math.max(maxBottom, y + labelH + signH + 36);
+  });
+
+  return maxBottom;
 }
 
 export async function exportBonPdf(bonId: number): Promise<{ buffer: Buffer; filename: string } | null> {
