@@ -2,8 +2,14 @@ import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
+import {
+  formatLigneDetail,
+  formatLignePrestationLabel,
+  isPneuLigne,
+  ligneTotalHt,
+  MONTAGE_INCLUS_NOTE,
+} from "@/lib/bon-lignes";
 
-const YELLOW = "#FFFF00";
 const GRAY = "#D9D9D9";
 const RED = "#C00000";
 const BORDER = "#000000";
@@ -52,21 +58,6 @@ function formatPrix(n: number | null | undefined) {
   return `${n.toFixed(2).replace(".", ",")}`;
 }
 
-function ligneIntervention(l: BonPdf["lignes"][number]) {
-  if (l.prestation) return l.prestation;
-  return `${l.emplacement} — ${l.dimension}`;
-}
-
-function splitLignes(bon: BonPdf) {
-  const pneuLignes = bon.lignes.filter(
-    (l) => l.type === "Pneumatique neuf" || (!l.prestation && l.emplacement !== "—")
-  );
-  const autreLignes = bon.lignes.filter(
-    (l) => l.prestation || (l.type !== "Pneumatique neuf" && l.emplacement === "—")
-  );
-  return { pneuLignes, autreLignes };
-}
-
 function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
   doc.strokeColor(BORDER).lineWidth(0.8).fillColor("#000000");
 
@@ -108,7 +99,7 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
   const lotLabelX = lotBoxX - doc.widthOfString(lotLabel) - 6;
   const lotY = titleY + 32;
   doc.text(lotLabel, lotLabelX, lotY);
-  drawYellowCell(doc, lotBoxX, lotY - 4, lotBoxW, 20);
+  drawValueCell(doc, lotBoxX, lotY - 4, lotBoxW, 20);
   doc.text(formatLot(bon.lot), lotBoxX + 2, lotY, { width: lotBoxW - 4, align: "center", lineBreak: false });
 
   let metaBottom = titleY + 52;
@@ -130,46 +121,19 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
     { label: "KILLOMETRAGE", value: bon.kilometrage != null ? String(bon.kilometrage) : "" },
   ]);
 
-  // —— PRESTATION (pneus) + INTERVENTION ——
-  const { pneuLignes, autreLignes } = splitLignes(bon);
-  const colGap = 14;
-  const leftW = contentW * 0.48;
-  const rightW = contentW - leftW - colGap;
+  // —— PRESTATIONS ——
   const blockTop = y + 16;
-
-  let leftBottom = blockTop;
-  if (pneuLignes.length === 0) {
-    leftBottom = drawLabelTable(doc, margin, blockTop, leftW, "PRESTATION", [
-      { label: "DIMENSION", value: "" },
-      { label: "QUANTITE", value: "" },
-      { label: "EMPLACEMENT", value: "" },
-      { label: "PRIX", value: "" },
-    ]);
-  } else {
-    for (let i = 0; i < pneuLignes.length; i++) {
-      const pneu = pneuLignes[i];
-      const title = pneuLignes.length > 1 ? `PRESTATION — ${pneu.emplacement}` : "PRESTATION";
-      leftBottom = drawLabelTable(doc, margin, leftBottom, leftW, title, [
-        { label: "DIMENSION", value: pneu.dimension },
-        { label: "QUANTITE", value: String(pneu.quantite) },
-        { label: "EMPLACEMENT", value: pneu.emplacement },
-        { label: "PRIX", value: formatPrix(pneu.prixUnitHt) },
-      ]);
-      if (i < pneuLignes.length - 1) leftBottom += 10;
-    }
+  const hasPneus = bon.lignes.some(isPneuLigne);
+  const prestBottom = drawPrestationsTable(doc, margin, blockTop, contentW, bon.lignes);
+  let noteY = prestBottom + 8;
+  if (hasPneus) {
+    doc.font(FONT).fontSize(9).fillColor("#444444");
+    doc.text(MONTAGE_INCLUS_NOTE, margin, noteY, { width: contentW });
+    noteY += 16;
   }
 
-  const interBottom = drawInterventionTable(
-    doc,
-    margin + leftW + colGap,
-    blockTop,
-    rightW,
-    autreLignes,
-    bon.totalHt,
-    leftBottom - blockTop
-  );
-
-  const footerY = Math.max(leftBottom, interBottom) + 36;
+  const totalY = drawMontantTotal(doc, margin, noteY + 10, contentW, bon.totalHt);
+  const footerY = totalY + 24;
 
   // —— Pied de page ——
   doc.font(FONT_BOLD).fontSize(11).fillColor(RED);
@@ -188,7 +152,7 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
   );
 }
 
-/** Titre + case jaune du n° de bon, sans retour à la ligne parasite. */
+/** Titre + case du n° de bon, sans retour à la ligne parasite. */
 function drawNumeroBonHeader(
   doc: PDFKit.PDFDocument,
   numero: string,
@@ -213,7 +177,7 @@ function drawNumeroBonHeader(
     const boxW = textW + hPad;
     if (boxW <= inlineMaxW) {
       const numBoxX = titleEndX + 10;
-      drawYellowCell(doc, numBoxX, titleY - 3, boxW, boxH);
+      drawValueCell(doc, numBoxX, titleY - 3, boxW, boxH);
       doc.text(numero, numBoxX + hPad / 2, titleY + 2, {
         width: boxW - hPad,
         align: "center",
@@ -228,7 +192,7 @@ function drawNumeroBonHeader(
   const stackY = titleY + 26;
   doc.font(FONT_BOLD).fontSize(12);
   const boxW = Math.min(doc.widthOfString(numero) + hPad, maxRight - margin);
-  drawYellowCell(doc, margin, stackY, boxW, boxH);
+  drawValueCell(doc, margin, stackY, boxW, boxH);
   doc.text(numero, margin + hPad / 2, stackY + 5, {
     width: boxW - hPad,
     align: "left",
@@ -237,8 +201,8 @@ function drawNumeroBonHeader(
   return stackY + boxH;
 }
 
-function drawYellowCell(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number) {
-  doc.rect(x, y, w, h).fillAndStroke(YELLOW, BORDER);
+function drawValueCell(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number) {
+  doc.rect(x, y, w, h).stroke();
   doc.fillColor("#000000");
 }
 
@@ -262,7 +226,7 @@ function drawLabelTable(
   let cy = y + headerH;
   for (const row of rows) {
     doc.rect(x, cy, labelW, rowH).stroke();
-    drawYellowCell(doc, x + labelW, cy, valueW, rowH);
+    drawValueCell(doc, x + labelW, cy, valueW, rowH);
     doc.font(FONT_BOLD).fontSize(10).fillColor("#000000");
     doc.text(row.label, x + 6, cy + 9, { width: labelW - 12 });
     doc.font(FONT).fontSize(11);
@@ -272,49 +236,112 @@ function drawLabelTable(
   return cy;
 }
 
-function drawInterventionTable(
+function drawPrestationsTable(
   doc: PDFKit.PDFDocument,
   x: number,
   y: number,
   w: number,
-  lignes: BonPdf["lignes"],
-  totalHt: number,
-  minHeight: number
+  lignes: BonPdf["lignes"]
 ) {
   const headerH = 24;
-  const labelW = Math.round(w * 0.28);
-  const valueW = w - labelW;
-  const minBody = minHeight - headerH;
-  const rowCount = Math.max(3, lignes.length);
-  const rowH = Math.max(28, Math.floor(minBody / (rowCount + 1)));
+  const subHeaderH = 22;
+  const rowH = 28;
+  const rowCount = Math.max(1, lignes.length);
+
+  const colPrestation = Math.round(w * 0.34);
+  const colDetail = Math.round(w * 0.26);
+  const colQte = Math.round(w * 0.08);
+  const colUnit = Math.round(w * 0.16);
+  const colTotal = w - colPrestation - colDetail - colQte - colUnit;
+
+  const cols = [
+    { w: colPrestation, label: "PRESTATION", align: "left" as const },
+    { w: colDetail, label: "DÉTAIL", align: "left" as const },
+    { w: colQte, label: "QTÉ", align: "center" as const },
+    { w: colUnit, label: "PRIX UNIT. HT", align: "right" as const },
+    { w: colTotal, label: "MONTANT HT", align: "right" as const },
+  ];
 
   doc.rect(x, y, w, headerH).fillAndStroke(GRAY, BORDER);
   doc.font(FONT_BOLD).fontSize(12).fillColor("#000000");
-  doc.text("INTERVENTION", x, y + 7, { width: w, align: "center" });
+  doc.text("PRESTATIONS", x, y + 7, { width: w, align: "center" });
 
   let cy = y + headerH;
+  let cx = x;
+  for (const col of cols) {
+    doc.rect(cx, cy, col.w, subHeaderH).stroke();
+    doc.font(FONT_BOLD).fontSize(8).fillColor("#000000");
+    doc.text(col.label, cx + 4, cy + 7, { width: col.w - 8, align: col.align });
+    cx += col.w;
+  }
+  cy += subHeaderH;
+
+  const dataRows =
+    lignes.length > 0
+      ? lignes
+      : [
+          {
+            type: "",
+            prestation: null,
+            emplacement: "",
+            dimension: "",
+            quantite: 0,
+            prixUnitHt: null,
+            totalHt: null,
+          } as BonPdf["lignes"][number],
+        ];
+
   for (let i = 0; i < rowCount; i++) {
-    const ligne = lignes[i];
-    doc.rect(x, cy, labelW, rowH).stroke();
-    if (ligne) {
-      drawYellowCell(doc, x + labelW, cy, valueW, rowH);
-      doc.font(FONT).fontSize(9).fillColor("#000000");
-      const txt = `${ligneIntervention(ligne)}${ligne.prixUnitHt != null ? ` — ${formatPrix(ligne.prixUnitHt)} €` : ""}`;
-      doc.text(txt, x + labelW + 5, cy + 9, { width: valueW - 10, lineGap: 1 });
-    } else {
-      doc.rect(x + labelW, cy, valueW, rowH).stroke();
+    const ligne = dataRows[i];
+    const values = ligne
+      ? [
+          formatLignePrestationLabel(ligne),
+          formatLigneDetail(ligne),
+          ligne.quantite ? String(ligne.quantite) : "",
+          formatPrix(ligne.prixUnitHt),
+          formatPrix(ligneTotalHt(ligne)),
+        ]
+      : ["", "", "", "", ""];
+
+    cx = x;
+    for (let c = 0; c < cols.length; c++) {
+      drawValueCell(doc, cx, cy, cols[c].w, rowH);
+      doc.font(FONT).fontSize(c === 0 ? 9 : 10).fillColor("#000000");
+      doc.text(values[c], cx + 4, cy + 9, {
+        width: cols[c].w - 8,
+        align: cols[c].align,
+        lineGap: 0,
+      });
+      cx += cols[c].w;
     }
     cy += rowH;
   }
 
-  doc.rect(x, cy, labelW, rowH).stroke();
-  doc.font(FONT_BOLD).fontSize(10).fillColor("#000000");
-  doc.text("PRIX", x + 6, cy + 10, { width: labelW - 12 });
-  drawYellowCell(doc, x + labelW, cy, valueW, rowH);
-  doc.font(FONT_BOLD).fontSize(12);
-  doc.text(`${formatPrix(totalHt)} €`, x + labelW + 6, cy + 9, { width: valueW - 12, align: "right" });
+  return cy;
+}
 
-  return cy + rowH;
+function drawMontantTotal(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  w: number,
+  totalHt: number
+) {
+  const h = 34;
+  const labelW = Math.round(w * 0.72);
+  const valueW = w - labelW;
+
+  doc.rect(x, y, labelW, h).fillAndStroke(GRAY, BORDER);
+  drawValueCell(doc, x + labelW, y, valueW, h);
+  doc.font(FONT_BOLD).fontSize(12).fillColor("#000000");
+  doc.text("MONTANT TOTAL HT", x + 8, y + 11, { width: labelW - 16, align: "right" });
+  doc.fontSize(14);
+  doc.text(`${formatPrix(totalHt)} €`, x + labelW + 8, y + 10, {
+    width: valueW - 16,
+    align: "right",
+  });
+
+  return y + h;
 }
 
 export async function exportBonPdf(bonId: number): Promise<{ buffer: Buffer; filename: string } | null> {

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { cn, formatEuro, QUANTITE_PNEUS_PAR_EMPACEMENT } from "@/lib/utils";
 import { filterCentresParLot, INPUT_TARIF_MATCH } from "@/lib/tarif-utils";
+import { MONTAGE_INCLUS_NOTE, MONTAGE_PRESTATION } from "@/lib/bon-lignes";
 import { LotSelect } from "@/components/lot-select";
 import { Mail, Plus, Save, Trash2 } from "lucide-react";
 import { downloadBonEmail } from "@/lib/download-bon-email";
@@ -53,11 +54,15 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
   const [error, setError] = useState("");
 
   const selected = immatriculations.find((i) => i.immatriculation === immat);
+  const selectedPneus = useMemo(() => pneuLines.filter((l) => l.selected), [pneuLines]);
 
-  const prestationsLot = useMemo(
-    () => prestations.filter((p) => p.lot === lot),
-    [prestations, lot]
-  );
+  const prestationsLot = useMemo(() => {
+    let list = prestations.filter((p) => p.lot === lot);
+    if (selectedPneus.length > 0) {
+      list = list.filter((p) => p.prestation !== MONTAGE_PRESTATION);
+    }
+    return list;
+  }, [prestations, lot, selectedPneus]);
 
   const centresDisponibles = useMemo(() => {
     if (!immat) return centres;
@@ -131,7 +136,11 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
     setExtraPrestations((prev) => prev.filter((p) => p.id !== id));
   }
 
-  const selectedPneus = useMemo(() => pneuLines.filter((l) => l.selected), [pneuLines]);
+  useEffect(() => {
+    if (selectedPneus.length > 0) {
+      setExtraPrestations((prev) => prev.filter((p) => p.prestation !== MONTAGE_PRESTATION));
+    }
+  }, [selectedPneus.length]);
 
   const total = useMemo(() => {
     const pneuTotal = selectedPneus.reduce(
@@ -293,7 +302,7 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Pneus</CardTitle>
+            <CardTitle>Pneus (fourniture + montage)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {pneuLines.length === 0 && (
@@ -330,7 +339,8 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
             ))}
             {pneuLines.length > 0 && (
               <p className="text-xs text-muted-foreground">
-                Décochez AVANT ou ARRIÈRE si non concerné — {QUANTITE_PNEUS_PAR_EMPACEMENT} pneus par essieu
+                Décochez AVANT ou ARRIÈRE si non concerné — {QUANTITE_PNEUS_PAR_EMPACEMENT} pneus par essieu.
+                {selectedPneus.length > 0 && ` ${MONTAGE_INCLUS_NOTE}`}
               </p>
             )}
           </CardContent>

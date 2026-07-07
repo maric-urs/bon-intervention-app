@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatEuro, STATUT_LABELS, STATUT_COLORS, type Statut } from "@/lib/utils";
+import { formatLigneDetail, formatLignePrestationLabel } from "@/lib/bon-lignes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/input";
 import { BonStatusPanel } from "@/components/bon-status-panel";
@@ -60,7 +61,7 @@ export default async function BonDetailPage({ params }: { params: Promise<{ id: 
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
-                <th className="pb-2 pr-4">Type</th>
+                <th className="pb-2 pr-4">Prestation</th>
                 <th className="pb-2 pr-4">Détail</th>
                 <th className="pb-2 pr-4">Qté</th>
                 <th className="pb-2 pr-4 text-right">Prix unit.</th>
@@ -70,10 +71,8 @@ export default async function BonDetailPage({ params }: { params: Promise<{ id: 
             <tbody>
               {bon.lignes.map((l) => (
                 <tr key={l.id} className="border-b last:border-0">
-                  <td className="py-2 pr-4">{l.type}</td>
-                  <td className="py-2 pr-4">
-                    {l.prestation ? l.prestation : `${l.emplacement} — ${l.dimension}`}
-                  </td>
+                  <td className="py-2 pr-4">{formatLignePrestationLabel(l)}</td>
+                  <td className="py-2 pr-4">{formatLigneDetail(l)}</td>
                   <td className="py-2 pr-4">{l.quantite}</td>
                   <td className="py-2 pr-4 text-right">{formatEuro(l.prixUnitHt)}</td>
                   <td className="py-2 text-right">{formatEuro(l.totalHt)}</td>

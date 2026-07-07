@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { exportBonPdf } from "@/lib/pdf-export";
+import {
+  formatLigneDetail,
+  formatLignePrestationLabel,
+  isPneuLigne,
+  ligneTotalHt,
+  MONTAGE_INCLUS_NOTE,
+} from "@/lib/bon-lignes";
 
 export type BonEmailLigne = {
   type?: string;
@@ -41,14 +48,17 @@ export function buildBonEmailBody(bon: BonEmailData) {
   t += `Kilométrage : ${bon.kilometrage ?? ""}\n\n`;
   t += "PRESTATIONS :\n";
   for (const l of bon.lignes) {
-    if (l.prestation) {
-      t += `- ${l.prestation} | ${l.prixUnitHt ?? 0} EUR HT\n`;
-    } else {
-      const lineTotal = l.totalHt ?? (l.prixUnitHt ?? 0) * l.quantite;
-      t += `- ${l.emplacement} | ${l.dimension} | qté ${l.quantite} | ${lineTotal.toFixed(2)} EUR HT\n`;
-    }
+    const label = formatLignePrestationLabel(l);
+    const detail = formatLigneDetail(l);
+    const total = ligneTotalHt(l);
+    t += `- ${label}`;
+    if (detail !== "—") t += ` | ${detail}`;
+    t += ` | qté ${l.quantite} | ${total.toFixed(2)} EUR HT\n`;
   }
-  t += `\nTOTAL HT : ${bon.totalHt.toFixed(2)} EUR\n\n`;
+  t += `\nTOTAL HT : ${bon.totalHt.toFixed(2)} EUR\n`;
+  if (bon.lignes.some(isPneuLigne)) {
+    t += `\n${MONTAGE_INCLUS_NOTE}\n`;
+  }
   t += "À faire figurer sur la facture : immatriculation, n° engagement, n° bon.\n\n";
   if (bon.demandeur) t += `Cordialement,\n${bon.demandeur}`;
   return t;
