@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
         marque: body.marque,
         modele: body.modele,
         demandeur: body.demandeur || null,
+        notes: body.notes?.trim() || null,
         kilometrage: body.kilometrage,
         centreId: centre.id,
         totalHt,

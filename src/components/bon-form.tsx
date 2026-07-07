@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Select } from "@/components/ui/input";
+import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { cn, formatEuro, QUANTITE_PNEUS_PAR_EMPACEMENT } from "@/lib/utils";
 import { filterCentresParLot, INPUT_TARIF_MATCH } from "@/lib/tarif-utils";
 import { MONTAGE_INCLUS_NOTE, MONTAGE_PRESTATION } from "@/lib/bon-lignes";
+import { engagementFromLot } from "@/lib/engagement-lots";
 import { LotSelect } from "@/components/lot-select";
 import { Mail, Plus, Save, Trash2 } from "lucide-react";
 import { downloadBonEmail } from "@/lib/download-bon-email";
@@ -43,8 +44,9 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
   const router = useRouter();
   const [centreId, setCentreId] = useState("");
   const [immat, setImmat] = useState("");
-  const [engagement, setEngagement] = useState("");
+  const [engagement, setEngagement] = useState(() => engagementFromLot(defaultLot));
   const [demandeur, setDemandeur] = useState("");
+  const [commentaire, setCommentaire] = useState("");
   const [kilometrage, setKilometrage] = useState("");
   const [lot, setLot] = useState(defaultLot);
   const [pneuLines, setPneuLines] = useState<PneuLine[]>([]);
@@ -86,6 +88,10 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
     setExtraPrestations([]);
     setAddPrestaKey("");
   }
+
+  useEffect(() => {
+    setEngagement(engagementFromLot(lot));
+  }, [lot]);
 
   useEffect(() => {
     if (centresDisponibles.length === 0) {
@@ -216,6 +222,7 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
           lot,
           numeroEngagement: engagement,
           demandeur,
+          notes: commentaire.trim() || null,
           kilometrage: kilometrage ? Number(kilometrage) : null,
           lignes,
           markEnvoye: andMail,
@@ -290,6 +297,15 @@ export function BonForm({ centres, immatriculations, prestations, lots }: Props)
           <div className="space-y-2 sm:col-span-2">
             <Label>Demandeur</Label>
             <Input value={demandeur} onChange={(e) => setDemandeur(e.target.value)} />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Commentaire</Label>
+            <Textarea
+              value={commentaire}
+              onChange={(e) => setCommentaire(e.target.value)}
+              rows={3}
+              placeholder="Instructions ou remarques à faire figurer sur le bon (PDF)"
+            />
           </div>
           {selected && (
             <div className="sm:col-span-2 rounded-lg bg-muted/60 p-3 text-sm">

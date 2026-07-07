@@ -47,6 +47,7 @@ export default async function BonDetailPage({ params }: { params: Promise<{ id: 
             <div><span className="text-muted-foreground">Centre</span><div>{bon.centre.nom}</div></div>
             <div><span className="text-muted-foreground">Kilométrage</span><div>{bon.kilometrage ?? "—"}</div></div>
             <div className="sm:col-span-2"><span className="text-muted-foreground">Demandeur</span><div>{bon.demandeur || "—"}</div></div>
+            <div className="sm:col-span-2"><span className="text-muted-foreground">Commentaire</span><div className="whitespace-pre-wrap">{bon.notes || "—"}</div></div>
           </CardContent>
         </Card>
 

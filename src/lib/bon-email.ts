@@ -29,6 +29,7 @@ export type BonEmailData = {
   modele: string;
   kilometrage: number | null;
   demandeur: string | null;
+  notes?: string | null;
   totalHt: number;
   lignes: BonEmailLigne[];
 };
@@ -45,8 +46,9 @@ export function buildBonEmailBody(bon: BonEmailData) {
   t += `Centre : ${bon.centre.nom}\n`;
   t += `Immatriculation : ${bon.immatriculation}\n`;
   t += `Véhicule : ${bon.marque} ${bon.modele}\n`;
-  t += `Kilométrage : ${bon.kilometrage ?? ""}\n\n`;
-  t += "PRESTATIONS :\n";
+  t += `Kilométrage : ${bon.kilometrage ?? ""}\n`;
+  if (bon.notes?.trim()) t += `Commentaire : ${bon.notes.trim()}\n`;
+  t += "\nPRESTATIONS :\n";
   for (const l of bon.lignes) {
     const label = formatLignePrestationLabel(l);
     const detail = formatLigneDetail(l);
@@ -129,6 +131,7 @@ async function fetchBonEmailData(bonId: number): Promise<BonEmailData | null> {
     modele: bon.modele,
     kilometrage: bon.kilometrage,
     demandeur: bon.demandeur,
+    notes: bon.notes,
     totalHt: bon.totalHt,
     lignes: bon.lignes,
   };

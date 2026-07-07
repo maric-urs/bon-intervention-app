@@ -133,9 +133,10 @@ function drawBonPdf(doc: PDFKit.PDFDocument, bon: BonPdf) {
   }
 
   const totalY = drawMontantTotal(doc, margin, noteY + 10, contentW, bon.totalHt);
+  const commentY = drawCommentaireBox(doc, margin, totalY + 20, contentW, bon.notes);
 
   // —— Pied de page ——
-  let footerY = totalY + 24;
+  let footerY = commentY + 20;
   doc.font(FONT_BOLD).fontSize(11).fillColor(RED);
   doc.text("VEUILLEZ FAIRE APPARAITRE SUR VOTRE FACTURE :", margin, footerY);
   doc.font(FONT).fontSize(11).fillColor("#000000");
@@ -344,6 +345,39 @@ function drawMontantTotal(
   });
 
   return y + h;
+}
+
+function drawCommentaireBox(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  w: number,
+  text: string | null | undefined
+) {
+  const headerH = 24;
+  const padding = 10;
+  const minBodyH = 48;
+  const content = text?.trim() || "";
+
+  doc.font(FONT).fontSize(10);
+  const textH = content
+    ? doc.heightOfString(content, { width: w - padding * 2, lineGap: 2 })
+    : 0;
+  const bodyH = Math.max(minBodyH, textH + padding * 2);
+
+  doc.rect(x, y, w, headerH).fillAndStroke(GRAY, BORDER);
+  doc.font(FONT_BOLD).fontSize(12).fillColor("#000000");
+  doc.text("COMMENTAIRE", x, y + 7, { width: w, align: "center" });
+  drawValueCell(doc, x, y + headerH, w, bodyH);
+  if (content) {
+    doc.font(FONT).fontSize(10).fillColor("#000000");
+    doc.text(content, x + padding, y + headerH + padding, {
+      width: w - padding * 2,
+      lineGap: 2,
+    });
+  }
+
+  return y + headerH + bodyH;
 }
 
 function drawSignatureBlock(
