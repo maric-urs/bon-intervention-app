@@ -353,37 +353,21 @@ function drawSignatureBlock(
   w: number,
   bon: BonPdf
 ) {
-  const gap = 20;
-  const boxW = (w - gap) / 2;
+  const boxW = Math.round(w * 0.4);
+  const bx = x + w - boxW;
   const labelH = 16;
   const signH = 64;
 
-  const blocks = [
-    {
-      title: "Signature du prestataire",
-      subtitle: bon.centre.nom,
-      dateLabel: "Date :",
-    },
-    {
-      title: "Visa CACEM",
-      subtitle: bon.demandeur || "Nom et qualité du signataire",
-      dateLabel: "Date :",
-    },
-  ];
+  doc.font(FONT_BOLD).fontSize(10).fillColor("#000000");
+  doc.text("Validation CACEM", bx, y, { width: boxW, align: "center" });
+  drawValueCell(doc, bx, y + labelH, boxW, signH);
+  doc.font(FONT).fontSize(9).fillColor("#444444");
+  if (bon.demandeur) {
+    doc.text(bon.demandeur, bx + 6, y + labelH + signH + 6, { width: boxW - 12, align: "center" });
+  }
+  doc.text("Date :", bx + 8, y + labelH + signH + (bon.demandeur ? 22 : 8), { width: boxW - 16 });
 
-  let maxBottom = y;
-  blocks.forEach((block, i) => {
-    const bx = x + i * (boxW + gap);
-    doc.font(FONT_BOLD).fontSize(10).fillColor("#000000");
-    doc.text(block.title, bx, y, { width: boxW, align: "center" });
-    drawValueCell(doc, bx, y + labelH, boxW, signH);
-    doc.font(FONT).fontSize(9).fillColor("#444444");
-    doc.text(block.subtitle, bx + 6, y + labelH + signH + 6, { width: boxW - 12, align: "center" });
-    doc.text(block.dateLabel, bx + 8, y + labelH + signH + 22, { width: boxW - 16 });
-    maxBottom = Math.max(maxBottom, y + labelH + signH + 36);
-  });
-
-  return maxBottom;
+  return y + labelH + signH + (bon.demandeur ? 36 : 22);
 }
 
 export async function exportBonPdf(bonId: number): Promise<{ buffer: Buffer; filename: string } | null> {
